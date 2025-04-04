@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>101 Taş Hesaplama</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
+
   <style>
     body {
       background-color: #fef6e4;
@@ -15,7 +17,7 @@
     h1 {
       color: #2b2d42;
     }
-    video, canvas {
+    video, canvas {foto
       width: 90%;
       max-width: 400px;
       border-radius: 8px;
@@ -86,6 +88,46 @@
 
     // Sayfa yüklendiğinde kamera başlat
     window.addEventListener('load', startCamera);
+ChatGPT:
+OCR işlemi henüz eklenmemiş gibi görünüyor. Şimdi tanıma işlemini ekleyelim! 🚀
+
+📌 OCR ile Taşları Okuma İşlemini Tamamlayalım
+📸 Fotoğraf çekildiğinde OCR motoru ile taşların üzerindeki sayıları tanıması gerekiyor.
+
+💡 Çözüm: Fotoğraf çekildikten sonra OCR'yi çağıran kodu ekleyelim.
+Aşağıdaki kodu, fotoğraf çekme fonksiyonunun içine ekleyerek OCR’yi başlatacağız.
+
+🔧 Güncellenmiş "captureImage()" Fonksiyonu
+📌 "index.html" içinde <script> etiketlerinin olduğu yere şunu ekle:
+
+html
+Kopyala
+Düzenle
+<script>
+    function captureImage() {
+        // Fotoğrafı çek ve canvas üzerine çiz
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Görseli kaydet ve göster
+        let imgData = canvas.toDataURL("image/png");
+        document.getElementById("capturedImage").src = imgData;
+        document.getElementById("capturedImage").style.display = "block";
+
+        // OCR ile tanıma başlat
+        document.getElementById("result").innerText = "Taşlar okunuyor...";
+
+        Tesseract.recognize(
+            imgData,
+            "eng",  // OCR dili (Rakamlar için İngilizce yeterli)
+            { logger: m => console.log(m) }  // Konsola ilerleme durumu yazdır
+        ).then(({ data: { text } }) => {
+            document.getElementById("result").innerText = "Okunan taşlar: " + text;
+        }).catch(err => {
+            document.getElementById("result").innerText = "OCR hatası: " + err;
+        });
+    }
   </script>
 
 </body>
