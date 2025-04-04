@@ -1,81 +1,53 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>101 Okey Taş Tanıma</title>
-    
-    <!-- OCR Motoru -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
-
-    <style>
-        body { text-align: center; font-family: Arial, sans-serif; }
-        video, canvas { width: 90%; max-width: 400px; margin-top: 10px; }
-        button { padding: 10px; font-size: 16px; margin-top: 10px; }
-    </style>
-</head>
-<body>
-
-    <h2>101 Okey Taş Tanıma</h2>
-
-    <video id="video" autoplay></video>
-    <br>
-    <button onclick="captureImage()">Fotoğraf Çek</button>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <img id="capturedImage" style="display:none; max-width: 90%;" />
-    <p id="result"></p>
-
-    <script>
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
-        const resultText = document.getElementById("result");
-
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { exact: "environment" } } // Arka kamera
-                });
-                video.srcObject = stream;
-            } catch (error) {
-                console.error("Kamera hatası:", error);
-                resultText.innerText = "Kameraya erişilemiyor. Tarayıcı izinlerini kontrol edin.";
-            }
+<script>
+    function captureImage() {
+        if (!video.srcObject) {
+            resultText.innerText = "Kamera çalışmıyor! Yeniden başlatmayı deneyin.";
+            return;
         }
 
-        function captureImage() {
-            if (!video.srcObject) {
-                resultText.innerText = "Kamera çalışmıyor! Yeniden başlatmayı deneyin.";
-                return;
+        // Fotoğrafı çek ve canvas üzerine çiz
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Görseli kaydet ve göster
+        let imgData = canvas.toDataURL("image/png");
+        document.getElementById("capturedImage").src = imgData;
+        document.getElementById("capturedImage").style.display = "block";
+
+        // OCR ile tanıma başlat
+        resultText.innerText = "Taşlar okunuyor...";
+
+        // OCR için Görüntü İşleme (Gri tonlama ve kontrast ayarı)
+        let img = new Image();
+        img.src = imgData;
+        img.onload = function() {
+            let tempCanvas = document.createElement("canvas");
+            let tempCtx = tempCanvas.getContext("2d");
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            tempCtx.drawImage(img, 0, 0);
+
+            let imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            let pixels = imageData.data;
+
+            // Gri tonlama ve kontrast artırma
+            for (let i = 0; i < pixels.length; i += 4) {
+                let avg = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                pixels[i] = pixels[i + 1] = pixels[i + 2] = avg > 128 ? 255 : 0; // Siyah-beyaz yap
             }
+            tempCtx.putImageData(imageData, 0, 0);
 
-            // Fotoğrafı çek ve canvas üzerine çiz
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Görseli kaydet ve göster
-            let imgData = canvas.toDataURL("image/png");
-            document.getElementById("capturedImage").src = imgData;
-            document.getElementById("capturedImage").style.display = "block";
-
-            // OCR ile tanıma başlat
-            resultText.innerText = "Taşlar okunuyor...";
-
+            // OCR'yi uygula
             Tesseract.recognize(
-                imgData,
+                tempCanvas.toDataURL("image/png"),
                 "eng",
                 { logger: m => console.log(m) }
             ).then(({ data: { text } }) => {
-                resultText.innerText = "Okunan taşlar: " + text;
+                resultText.innerText = "Okunan taşlar: " + text.replace(/[^0-9\s]/g, ""); // Sadece rakamları al
             }).catch(err => {
                 resultText.innerText = "OCR hatası: " + err;
             });
-        }
-
-        startCamera();  // Kamera başlatma fonksiyonunu çağır
-
-    </script>
-
-</body>
-</html>
+        };
+    }
+</script>
