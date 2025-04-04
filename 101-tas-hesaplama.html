@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>101 Taş Hesaplama</title>
+  <style>
+    body {
+      background-color: #fef6e4;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      text-align: center;
+      color: #333;
+    }
+    h1 {
+      color: #2b2d42;
+    }
+    video, canvas {
+      width: 90%;
+      max-width: 400px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 15px 5px;
+      background-color: #8ecae6;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #219ebc;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📷 101 Taş Hesaplama</h1>
+
+  <video id="video" autoplay playsinline></video>
+  <br>
+  <button onclick="captureImage()">📸 Fotoğraf Çek</button>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <p id="output"></p>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const output = document.getElementById('output');
+
+    // Kamerayı başlat (arka kamerayı tercih eder)
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { exact: "environment" } // Arka kamera tercihi
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        output.innerText = "Kamera başlatılamadı: " + err.message;
+        console.error(err);
+      }
+    }
+
+    // Fotoğraf çek
+    function captureImage() {
+      if (!video.srcObject) {
+        output.innerText = "Kamera çalışmıyor.";
+        return;
+      }
+
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Şu anlık sadece resmi yakalıyoruz, ileride OCR / taş tanıma entegre edilebilir
+      output.innerText = "Fotoğraf çekildi. (Tanıma işlemi henüz eklenmedi)";
+    }
+
+    // Sayfa yüklendiğinde kamera başlat
+    window.addEventListener('load', startCamera);
+  </script>
+
+</body>
+</html>
