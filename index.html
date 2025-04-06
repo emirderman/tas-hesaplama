@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>101 Okey Taş Tanıma</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+
 <style>
   body {
     font-family: sans-serif;
@@ -21,6 +23,12 @@
     padding: 10px 20px;
     margin-top: 10px;
   }
+  #result {
+    margin-top: 15px;
+    font-size: 18px;
+    color: #333;
+    white-space: pre-wrap;
+  }
 </style>
 </head>
 
@@ -29,13 +37,15 @@
 
 <video id="video" autoplay playsinline></video>
 <br>
-<button onclick="captureImage()">Fotoğraf Çek</button>
+<button onclick="captureImage()">Fotoğraf Çek ve Tara</button>
 <br>
 <img id="photo" style="display:none">
+<div id="result"></div>
 
 <script>
 const video = document.getElementById('video');
 const photo = document.getElementById('photo');
+const result = document.getElementById('result');
 
 navigator.mediaDevices.getUserMedia({
   video: { facingMode: { exact: "environment" } }
@@ -55,8 +65,24 @@ function captureImage() {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  photo.src = canvas.toDataURL('image/png');
+  
+  const imgData = canvas.toDataURL('image/png');
+  photo.src = imgData;
   photo.style.display = 'block';
+
+  result.innerText = "Taşlar okunuyor...";
+
+  Tesseract.recognize(
+    imgData,
+    'eng', // İstersen 'tur' da ekleyebiliriz
+    {
+      logger: m => console.log(m)
+    }
+  ).then(({ data: { text } }) => {
+    result.innerText = "Okunan Yazı:\n" + text;
+  }).catch(e => {
+    result.innerText = "Okuma Hatası: " + e;
+  });
 }
 </script>
 
