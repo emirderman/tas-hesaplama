@@ -62,13 +62,29 @@ navigator.mediaDevices.getUserMedia({
 
 function captureImage() {
   const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  
-  const imgData = canvas.toDataURL('image/png');
-  photo.src = imgData;
-  photo.style.display = 'block';
+const ctx = canvas.getContext('2d');
+
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+
+ctx.drawImage(video, 0, 0);
+
+let imgDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+let pixels = imgDataObj.data;
+
+// Siyah-Beyaz filtre
+for (let i = 0; i < pixels.length; i += 4) {
+  let avg = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+  let val = avg > 128 ? 255 : 0;
+  pixels[i] = pixels[i + 1] = pixels[i + 2] = val;
+}
+
+ctx.putImageData(imgDataObj, 0, 0);
+
+const imgData = canvas.toDataURL('image/png');
+photo.src = imgData;
+photo.style.display = 'block';
+
 
   result.innerText = "Taşlar okunuyor...";
 
