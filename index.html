@@ -72,17 +72,26 @@ function captureImage() {
 
   result.innerText = "Taşlar okunuyor...";
 
-  Tesseract.recognize(
-    imgData,
-    'eng', // İstersen 'tur' da ekleyebiliriz
-    {
-      logger: m => console.log(m)
-    }
-  ).then(({ data: { text } }) => {
-    result.innerText = "Okunan Yazı:\n" + text;
-  }).catch(e => {
-    result.innerText = "Okuma Hatası: " + e;
-  });
+ Tesseract.recognize(
+  imgData,
+  'eng',
+  {
+    logger: m => console.log(m)
+  }
+).then(({ data: { text } }) => {
+  result.innerText = "Okunan Yazı:\n" + text;
+
+  // Rakamları yakala (1-2-3-4-... gibi)
+  const numbers = text.match(/\d+/g);
+
+  if (numbers) {
+    result.innerText += "\n\nAlgılanan Taşlar:\n" + numbers.join(' - ');
+  } else {
+    result.innerText += "\n\nTaş bulunamadı.";
+  }
+}).catch(e => {
+  result.innerText = "Okuma Hatası: " + e;
+});
 }
 </script>
 
