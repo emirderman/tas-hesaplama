@@ -1,53 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>101 Okey Taş Tanıma</title>
+<style>
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    background-color: #f2f2f2;
+    margin: 0;
+    padding: 20px;
+  }
+  video, img {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 10px;
+  }
+  button {
+    padding: 10px 20px;
+    margin-top: 10px;
+  }
+</style>
+</head>
+
+<body>
+<h2>101 Okey Taş Hesaplama</h2>
+
+<video id="video" autoplay playsinline></video>
+<br>
+<button onclick="captureImage()">Fotoğraf Çek</button>
+<br>
+<img id="photo" style="display:none">
+
 <script>
-    function captureImage() {
-        if (!video.srcObject) {
-            resultText.innerText = "Kamera çalışmıyor! Yeniden başlatmayı deneyin.";
-            return;
-        }
+const video = document.getElementById('video');
+const photo = document.getElementById('photo');
 
-        // Fotoğrafı çek ve canvas üzerine çiz
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: { exact: "environment" } }
+})
+.then(stream => {
+  video.srcObject = stream;
+})
+.catch(err => {
+  console.log("Arka kamera bulunamadı, ön kamera açılıyor...");
+  navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => video.srcObject = stream)
+  .catch(e => alert("Kamera açılamadı: " + e));
+});
 
-        // Görseli kaydet ve göster
-        let imgData = canvas.toDataURL("image/png");
-        document.getElementById("capturedImage").src = imgData;
-        document.getElementById("capturedImage").style.display = "block";
-
-        // OCR ile tanıma başlat
-        resultText.innerText = "Taşlar okunuyor...";
-
-        // OCR için Görüntü İşleme (Gri tonlama ve kontrast ayarı)
-        let img = new Image();
-        img.src = imgData;
-        img.onload = function() {
-            let tempCanvas = document.createElement("canvas");
-            let tempCtx = tempCanvas.getContext("2d");
-            tempCanvas.width = img.width;
-            tempCanvas.height = img.height;
-            tempCtx.drawImage(img, 0, 0);
-
-            let imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-            let pixels = imageData.data;
-
-            // Gri tonlama ve kontrast artırma
-            for (let i = 0; i < pixels.length; i += 4) {
-                let avg = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-                pixels[i] = pixels[i + 1] = pixels[i + 2] = avg > 128 ? 255 : 0; // Siyah-beyaz yap
-            }
-            tempCtx.putImageData(imageData, 0, 0);
-
-            // OCR'yi uygula
-            Tesseract.recognize(
-                tempCanvas.toDataURL("image/png"),
-                "eng",
-                { logger: m => console.log(m) }
-            ).then(({ data: { text } }) => {
-                resultText.innerText = "Okunan taşlar: " + text.replace(/[^0-9\s]/g, ""); // Sadece rakamları al
-            }).catch(err => {
-                resultText.innerText = "OCR hatası: " + err;
-            });
-        };
-    }
+function captureImage() {
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  photo.src = canvas.toDataURL('image/png');
+  photo.style.display = 'block';
+}
 </script>
+
+</body>
+</html>
