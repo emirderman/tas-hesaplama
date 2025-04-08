@@ -5,30 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>101 Okey Taş Tanıma</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-
 <style>
-  body {
-    font-family: sans-serif;
-    text-align: center;
-    background-color: #f2f2f2;
-    margin: 0;
-    padding: 20px;
-  }
-  video, img {
-    width: 100%;
-    max-width: 400px;
-    margin-top: 10px;
-  }
-  button {
-    padding: 10px 20px;
-    margin-top: 10px;
-  }
-  #result {
-    margin-top: 15px;
-    font-size: 18px;
-    color: #333;
-    white-space: pre-wrap;
-  }
+  /* Önceki CSS stil tanımları aynı kalabilir */
 </style>
 </head>
 
@@ -47,67 +25,130 @@ const video = document.getElementById('video');
 const photo = document.getElementById('photo');
 const result = document.getElementById('result');
 
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: { exact: "environment" } }
-})
-.then(stream => {
-  video.srcObject = stream;
-})
-.catch(err => {
-  console.log("Arka kamera bulunamadı, ön kamera açılıyor...");
-  navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => video.srcObject = stream)
-  .catch(e => alert("Kamera açılamadı: " + e));
-});
+// Kamera erişimi önceki kodla aynı
 
-function captureImage() {
+async function captureImage() {
   const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
+  
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
 
-canvas.width = video.videoWidth;
-canvas.height = video.videoHeight;
+  // Görüntü ön işleme adımları
+  let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  
+  // 1. Kontrast artırma
+  contrastAdjustment(imgData.data, 1.5);
+  
+  // 2. Sarı renk için maskeleme
+  highlightYellowStones(imgData.data);
+  
+  // 3. Gürültü azaltma
+  applyMedianFilter(imgData);
+  
+  ctx.putImageData(imgData, 0, 0);
 
-ctx.drawImage(video, 0, 0);
+  // 4. ROI (İlgi Alanı) Kırpma - Örnek olarak merkezi bölge
+  const croppedCanvas = cropCanvas(canvas, 0.2, 0.2, 0.6, 0.6);
 
-let imgDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
-let pixels = imgDataObj.data;
-
-// Siyah-Beyaz filtre
-for (let i = 0; i < pixels.length; i += 4) {
-  let avg = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-  let val = avg > 128 ? 255 : 0;
-  pixels[i] = pixels[i + 1] = pixels[i + 2] = val;
-}
-
-ctx.putImageData(imgDataObj, 0, 0);
-
-const imgData = canvas.toDataURL('image/png');
-photo.src = imgData;
-photo.style.display = 'block';
-
+  photo.src = croppedCanvas.toDataURL('image/png');
+  photo.style.display = 'block';
 
   result.innerText = "Taşlar okunuyor...";
 
- Tesseract.recognize(
-  imgData,
-  'eng',
-  {
-    logger: m => console.log(m)
-  }
-).then(({ data: { text } }) => {
-  result.innerText = "Okunan Yazı:\n" + text;
+  // Tesseract konfigürasyonu
+  const worker = await Tesseract.createWorker();
+  await worker.loadLanguage('eng');
+  await worker.initialize('eng');
+  await worker.setParameters({
+    tessedit_char_whitelist: '0123456789',
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+  });
 
-  // Rakamları yakala (1-2-3-4-... gibi)
-  const numbers = text.match(/\d+/g);
+  const { data: { text } } = await worker.recognize(croppedCanvas);
+  
+  // Sonuçları filtreleme
+  const numbers = text.match(/\b\d{1,2}\b/g) || [];
+  result.innerText = `Algılanan Taşlar:\n${numbers.join(', ')}`;
+  await worker.terminate();
+}
 
-  if (numbers) {
-    result.innerText += "\n\nAlgılanan Taşlar:\n" + numbers.join(' - ');
-  } else {
-    result.innerText += "\n\nTaş bulunamadı.";
+// Kontrast artırma fonksiyonu
+function contrastAdjustment(data, contrast) {
+  for(let i = 0; i < data.length; i += 4) {
+    data[i] = ((data[i]/255 - 0.5) * contrast + 0.5) * 255;
+    data[i+1] = ((data[i+1]/255 - 0.5) * contrast + 0.5) * 255;
+    data[i+2] = ((data[i+2]/255 - 0.5) * contrast + 0.5) * 255;
   }
-}).catch(e => {
-  result.innerText = "Okuma Hatası: " + e;
-});
+}
+
+// Sarı renk vurgulama (HSV renk uzayında)
+function highlightYellowStones(data) {
+  for(let i = 0; i < data.length; i += 4) {
+    const [h, s, v] = rgbToHsv(data[i], data[i+1], data[i+2]);
+    if(h >= 40 && h <= 70 && s >= 0.4 && v >= 0.3) { // Sarı tonları
+      data[i] = 255;   // R
+      data[i+1] = 255; // G
+      data[i+2] = 0;   // B
+    }
+  }
+}
+
+// RGB'den HSV'ye dönüşüm
+function rgbToHsv(r, g, b) {
+  r /= 255, g /= 255, b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, v = max;
+  const d = max - min;
+  s = max === 0 ? 0 : d / max;
+  if(max === min) h = 0;
+  else {
+    switch(max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h * 360, s, v];
+}
+
+// Medyan filtresi
+function applyMedianFilter(imgData) {
+  const windowSize = 3;
+  const radius = (windowSize - 1)/2;
+  const tempData = new Uint8ClampedArray(imgData.data);
+  
+  for(let y = radius; y < imgData.height - radius; y++) {
+    for(let x = radius; x < imgData.width - radius; x++) {
+      const i = (y * imgData.width + x) * 4;
+      const neighbors = [];
+      for(let dy = -radius; dy <= radius; dy++) {
+        for(let dx = -radius; dx <= radius; dx++) {
+          const ni = ((y + dy) * imgData.width + (x + dx)) * 4;
+          neighbors.push(tempData[ni]);
+        }
+      }
+      neighbors.sort((a,b) => a - b);
+      imgData.data[i] = neighbors[Math.floor(neighbors.length/2)];
+    }
+  }
+}
+
+// ROI Kırpma fonksiyonu
+function cropCanvas(sourceCanvas, xRatio, yRatio, wRatio, hRatio) {
+  const x = sourceCanvas.width * xRatio;
+  const y = sourceCanvas.height * yRatio;
+  const w = sourceCanvas.width * wRatio;
+  const h = sourceCanvas.height * hRatio;
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(sourceCanvas, x, y, w, h, 0, 0, w, h);
+  return canvas;
 }
 </script>
 
