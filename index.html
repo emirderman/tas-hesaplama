@@ -1,156 +1,26 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>101 Okey Taş Tanıma</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-<style>
-  /* Önceki CSS stil tanımları aynı kalabilir */
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>okeyscan</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-<h2>101 Okey Taş Hesaplama</h2>
+  <h1>🀄 okeyscan</h1>
 
-<video id="video" autoplay playsinline></video>
-<br>
-<button onclick="captureImage()">Fotoğraf Çek ve Tara</button>
-<br>
-<img id="photo" style="display:none">
-<div id="result"></div>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display: none;"></canvas>
 
-<script>
-const video = document.getElementById('video');
-const photo = document.getElementById('photo');
-const result = document.getElementById('result');
+  <div class="buttons">
+    <button onclick="captureImage()">📷 Fotoğraf Çek</button>
+    <button onclick="startCamera()">🔁 Kamerayı Yeniden Başlat</button>
+  </div>
 
-// Kamera erişimi önceki kodla aynı
+  <div id="results">Tanıma bekleniyor...</div>
 
-async function captureImage() {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0);
-
-  // Görüntü ön işleme adımları
-  let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  
-  // 1. Kontrast artırma
-  contrastAdjustment(imgData.data, 1.5);
-  
-  // 2. Sarı renk için maskeleme
-  highlightYellowStones(imgData.data);
-  
-  // 3. Gürültü azaltma
-  applyMedianFilter(imgData);
-  
-  ctx.putImageData(imgData, 0, 0);
-
-  // 4. ROI (İlgi Alanı) Kırpma - Örnek olarak merkezi bölge
-  const croppedCanvas = cropCanvas(canvas, 0.2, 0.2, 0.6, 0.6);
-
-  photo.src = croppedCanvas.toDataURL('image/png');
-  photo.style.display = 'block';
-
-  result.innerText = "Taşlar okunuyor...";
-
-  // Tesseract konfigürasyonu
-  const worker = await Tesseract.createWorker();
-  await worker.loadLanguage('eng');
-  await worker.initialize('eng');
-  await worker.setParameters({
-    tessedit_char_whitelist: '0123456789',
-    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-  });
-
-  const { data: { text } } = await worker.recognize(croppedCanvas);
-  
-  // Sonuçları filtreleme
-  const numbers = text.match(/\b\d{1,2}\b/g) || [];
-  result.innerText = `Algılanan Taşlar:\n${numbers.join(', ')}`;
-  await worker.terminate();
-}
-
-// Kontrast artırma fonksiyonu
-function contrastAdjustment(data, contrast) {
-  for(let i = 0; i < data.length; i += 4) {
-    data[i] = ((data[i]/255 - 0.5) * contrast + 0.5) * 255;
-    data[i+1] = ((data[i+1]/255 - 0.5) * contrast + 0.5) * 255;
-    data[i+2] = ((data[i+2]/255 - 0.5) * contrast + 0.5) * 255;
-  }
-}
-
-// Sarı renk vurgulama (HSV renk uzayında)
-function highlightYellowStones(data) {
-  for(let i = 0; i < data.length; i += 4) {
-    const [h, s, v] = rgbToHsv(data[i], data[i+1], data[i+2]);
-    if(h >= 40 && h <= 70 && s >= 0.4 && v >= 0.3) { // Sarı tonları
-      data[i] = 255;   // R
-      data[i+1] = 255; // G
-      data[i+2] = 0;   // B
-    }
-  }
-}
-
-// RGB'den HSV'ye dönüşüm
-function rgbToHsv(r, g, b) {
-  r /= 255, g /= 255, b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h, s, v = max;
-  const d = max - min;
-  s = max === 0 ? 0 : d / max;
-  if(max === min) h = 0;
-  else {
-    switch(max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return [h * 360, s, v];
-}
-
-// Medyan filtresi
-function applyMedianFilter(imgData) {
-  const windowSize = 3;
-  const radius = (windowSize - 1)/2;
-  const tempData = new Uint8ClampedArray(imgData.data);
-  
-  for(let y = radius; y < imgData.height - radius; y++) {
-    for(let x = radius; x < imgData.width - radius; x++) {
-      const i = (y * imgData.width + x) * 4;
-      const neighbors = [];
-      for(let dy = -radius; dy <= radius; dy++) {
-        for(let dx = -radius; dx <= radius; dx++) {
-          const ni = ((y + dy) * imgData.width + (x + dx)) * 4;
-          neighbors.push(tempData[ni]);
-        }
-      }
-      neighbors.sort((a,b) => a - b);
-      imgData.data[i] = neighbors[Math.floor(neighbors.length/2)];
-    }
-  }
-}
-
-// ROI Kırpma fonksiyonu
-function cropCanvas(sourceCanvas, xRatio, yRatio, wRatio, hRatio) {
-  const x = sourceCanvas.width * xRatio;
-  const y = sourceCanvas.height * yRatio;
-  const w = sourceCanvas.width * wRatio;
-  const h = sourceCanvas.height * hRatio;
-  
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(sourceCanvas, x, y, w, h, 0, 0, w, h);
-  return canvas;
-}
-</script>
-
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <script async src="https://docs.opencv.org/4.5.2/opencv.js" onload="onOpenCvReady();"></script>
+  <script src="script.js"></script>
 </body>
 </html>
